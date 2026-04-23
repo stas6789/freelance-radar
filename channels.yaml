@@ -1,0 +1,29 @@
+# Список Telegram-каналов с заказами на фриланс.
+# Можно редактировать без изменения кода.
+# Формат: имя канала (@username) или публичная ссылка t.me/name.
+
+channels:
+  # --- широкие IT/фриланс каналы ---
+  - "@webjobs"
+  - "@jobforjunior"
+  - "@distantsiya"
+  - "@forallfreelancers"
+  - "@remote_it"
+  - "@freelance_ru"
+  - "@ru_jobs"
+
+  # --- Python / боты / парсинг ---
+  - "@python_jobs"
+  - "@bot_makers_jobs"
+  - "@parsing_jobs"
+  - "@python_freelance"
+
+  # --- тексты / копирайт / переводы ---
+  - "@work_texts"
+  - "@copywriter_job"
+  - "@writer_job"
+  - "@translator_job"
+
+  # --- дизайн ---
+  - "@design_jobs"
+  - "@design_freelance"
