@@ -1,88 +1,168 @@
 # freelance-radar
 
-Агент, который смотрит за Telegram-каналами с заказами на фриланс, фильтрует
-их (код / сайты / тексты / дизайн / боты / парсеры) и шлёт только подходящие
-тебе в личку. Ты решаешь, что брать.
+Агент, который смотрит за Telegram-каналами с заказами на фриланс,
+фильтрует их (код / сайты / тексты / дизайн / боты / парсеры) и шлёт
+только подходящие тебе — в ЛС Telegram и/или в локальный дашборд.
+Ты решаешь, что брать.
+
+## Два режима
+
+### 🟢 Режим `web` — без API_ID, без номера телефона (рекомендую)
+
+Парсит публичные веб-страницы каналов `t.me/s/<name>`. Уведомления
+присылает **твой собственный бот**, созданный у [@BotFather](https://t.me/BotFather)
+за 30 секунд — никакого `my.telegram.org`, никакой регистрации приложения.
 
 ```
-TG-каналы ─► Telethon ─► Классификатор (LLM+keywords) ─► Твой Telegram
+t.me/s/<channel>  ──►  HTTP-поллинг каждые ~2 мин
+                              ↓
+                     Классификатор (LLM/keywords)
+                              ↓
+                  ┌───────────┴───────────┐
+                  ▼                       ▼
+        Твой TG-бот (ЛС)         Локальный дашборд
+        (@BotFather)             (localhost:8080)
 ```
+
+### 🟡 Режим `telethon` — реалтайм, но нужен TG API_ID
+
+Логинится под твоим TG-аккаунтом и читает каналы в реальном времени.
+Нужны `API_ID`, `API_HASH`, номер телефона и SMS-код при первом запуске.
+Подходит, если хочешь минимальную задержку и готов получить креды у
+[my.telegram.org](https://my.telegram.org/auth).
 
 ## Что умеет
 
-- Подписывается на любое количество публичных каналов с заказами.
-- Определяет, это заказ или нет; извлекает категорию, бюджет, срочность,
+- Следит за любым количеством публичных каналов (список в `channels.yaml`).
+- Определяет: это заказ или нет; извлекает категорию, бюджет, срочность,
   контакт клиента.
-- Отфильтровывает нерелевантное (категории задаются в `.env`).
-- Шлёт красивую карточку в твой TG — в «Избранное» или другому юзеру.
-- Хранит историю в SQLite, чтобы не присылать одну и ту же задачу дважды.
-- Работает с LLM (DeepSeek / OpenAI / любой OpenAI-совместимый) или без него
-  (keyword-фильтр).
+- Отфильтровывает нерелевантное (категории и минимальный бюджет — в `.env`).
+- Шлёт красивую карточку в Telegram (через бота или через Telethon).
+- Показывает все отфильтрованные заказы на локальном HTML-дашборде с
+  фильтрами по категории / бюджету / срочности.
+- Хранит историю в SQLite — одну задачу дважды не пришлёт.
+- Работает с LLM (DeepSeek / OpenAI / любой OpenAI-совместимый) или без
+  него (keyword-фильтр — запускается офлайн).
 
-## Установка
+## Быстрый старт (режим web)
 
 ```bash
 git clone <repo-url> freelance-radar
 cd freelance-radar
 
 python3 -m venv .venv
-source .venv/bin/activate
-
+source .venv/bin/activate            # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-# или: pip install -e .
+
+cp .env.example .env                 # Windows: copy .env.example .env
+# теперь открой .env и заполни BOT_TOKEN и CHAT_ID (см. ниже)
 ```
 
-## Получить Telegram API_ID / API_HASH
+### 1. Создай бота и получи `BOT_TOKEN`
 
-1. Открой https://my.telegram.org/auth
-2. Войди по своему номеру, введи код из TG.
-3. «API development tools» → создай приложение:
-   - App title: `freelance-radar`
-   - Short name: `freelance_radar`
-   - Platform: `Desktop`
-4. Скопируй `api_id` (число) и `api_hash` (строка).
+1. Открой в Telegram → [@BotFather](https://t.me/BotFather)
+2. Напиши `/newbot`
+3. Придумай имя (например, `Мой фриланс-радар`) и username (должен
+   заканчиваться на `bot`, например `stas_radar_bot`)
+4. BotFather пришлёт строку вида `123456789:AAFxxxxxxxxxxxxxxxxxxxxxx` —
+   это `BOT_TOKEN`. Вставь её в `.env`.
 
-## Настройка
+### 2. Получи свой `CHAT_ID`
+
+Простейший способ: напиши любому из этих ботов — они сразу покажут твой id:
+
+- [@userinfobot](https://t.me/userinfobot) → `/start`
+- или [@getmyid_bot](https://t.me/getmyid_bot)
+
+Скопируй число и вставь в `CHAT_ID` в `.env`.
+
+### 3. Напиши `/start` своему собственному боту
+
+Это обязательный шаг в Telegram: бот не может писать тебе первым, пока
+ты не начнёшь с ним диалог.
+
+### 4. Проверь, что всё настроено
 
 ```bash
-cp .env.example .env
-# Заполни TG_API_ID, TG_API_HASH, TG_PHONE, TG_NOTIFY_TARGET.
-# Опционально: LLM_API_KEY (DeepSeek / OpenAI).
+python -m freelance_radar.main check-bot
 ```
 
-### Куда шлём уведомления: `TG_NOTIFY_TARGET`
+Если всё ок — в Telegram прилетит тестовое сообщение. Если нет —
+команда подскажет что именно сломано.
 
-- `me` — в «Избранное» (Saved Messages). **Рекомендую для старта.**
-- `@username` — личка другому аккаунту.
-- Числовой `user_id` — тоже работает.
-
-### Каналы
-
-Правь `channels.yaml`. Стартовый список покрывает боты / парсинг / сайты /
-тексты / дизайн.
-
-## Запуск
+### 5. Запусти радар
 
 ```bash
-# тест классификатора (без Telegram)
-python -m freelance_radar.main test-classify --text "Нужен бот для записи клиентов в парикмахерскую. Бюджет 15000 руб. Срочно. @ivan"
-
-# первый запуск — попросит ввести код из SMS
 python -m freelance_radar.main run
-
-# статистика
-python -m freelance_radar.main stats
 ```
 
-После первого запуска рядом появится файл `radar.session` — держи его рядом,
-это авторизация. Не коммить его в git (он уже в `.gitignore`).
+В логах увидишь `bot authorized as @stas_radar_bot; watching 11 channels…`.
+Дальше карточки с новыми заказами будут прилетать тебе в ЛС к боту.
 
-## Как оставить работать постоянно
+### 6. (Опция) Открой дашборд
 
-### Вариант 1. На своём ПК
-Запусти в `screen` / `tmux` — работает пока комп включён.
+В отдельном терминале:
 
-### Вариант 2. systemd на Linux-сервере (напр. Oracle Cloud Free Tier)
+```bash
+python -m freelance_radar.main dashboard
+```
+
+Открой `http://localhost:8080` — увидишь историю всех подходящих заказов
+с фильтрами и автообновлением.
+
+## Команды CLI
+
+```bash
+python -m freelance_radar.main run               # запуск сбора (web/telethon)
+python -m freelance_radar.main dashboard         # HTML-дашборд
+python -m freelance_radar.main check-bot         # проверка BOT_TOKEN + CHAT_ID
+python -m freelance_radar.main test-classify --text "Нужен бот ..."
+python -m freelance_radar.main stats             # сводка по БД
+```
+
+## Настройка каналов
+
+Правь `channels.yaml`. Дефолтный список — 11 активных русскоязычных
+каналов с заказами/вакансиями по коду, текстам и дизайну. Формат:
+
+```yaml
+channels:
+  - "@progjob"
+  - "@pythonrabota"
+  - "@writers_jobs"
+  # ... добавляй свои
+```
+
+Проверить, что канал читается через веб-версию, просто: открой
+`https://t.me/s/<name>` в браузере — если видишь посты, радар тоже видит.
+
+## Настройка фильтра в `.env`
+
+- `CATEGORIES=bot,parser,automation,website,text,design` — какие
+  категории пропускать в уведомления. Убирай те, что не нужны.
+- `MIN_BUDGET_RUB=0` — минимальный бюджет в ₽. Заказы ниже отфильтровываются.
+- `WEB_POLL_SECONDS=120` — период опроса каналов. Меньше 60 не
+  рекомендуется, можно словить rate-limit от Telegram.
+
+## Режим telethon (опционально)
+
+Если готов получить API_ID и хочешь работать в реальном времени:
+
+1. `MODE=telethon` в `.env`
+2. Получи `TG_API_ID` + `TG_API_HASH` на
+   [my.telegram.org](https://my.telegram.org/auth) → API development tools
+3. Заполни `TG_PHONE=+7XXXXXXXXXX` и `TG_NOTIFY_TARGET=me`
+4. Первый запуск — попросит код из SMS, дальше всё автоматом
+
+Файл `radar.session` появится после первой авторизации — он уже в
+`.gitignore`, не коммитить.
+
+## Постоянный запуск
+
+### На своём ПК
+`screen` / `tmux` — работает пока комп включён.
+
+### systemd на Linux (Oracle Cloud Free Tier и т. п.)
 
 `/etc/systemd/system/freelance-radar.service`:
 
@@ -109,7 +189,10 @@ sudo systemctl enable --now freelance-radar
 journalctl -u freelance-radar -f
 ```
 
-### Вариант 3. Docker
+Для дашборда заводится отдельный сервис `freelance-radar-dashboard.service`
+с `ExecStart=… dashboard`.
+
+### Docker
 
 ```dockerfile
 FROM python:3.11-slim
@@ -120,15 +203,13 @@ COPY . .
 CMD ["python", "-m", "freelance_radar.main", "run"]
 ```
 
-## Безопасность и риски
+## Безопасность
 
-- Telethon логинится **под твоим Telegram-аккаунтом** — это нужно для чтения
-  каналов (обычные боты так не могут).
-- Риск бана при обычном использовании (только чтение, без рассылки) —
-  минимальный.
-- Никогда не коммить `.env` и `*.session` файлы. Оба уже в `.gitignore`.
-- Если используешь виртуальный номер — бери премиум-тариф у провайдера
-  (5sim/sms-activate), дешёвые часто в бане.
+- `.env` и `*.session` — в `.gitignore`, никогда не коммить.
+- В режиме `web` не используется твой личный TG-аккаунт, только бот.
+- В режиме `telethon` риск бана при обычном использовании (только
+  чтение каналов, без рассылки) — минимальный. Если страшно — возьми
+  виртуальный номер (премиум-тариф у 5sim/sms-activate; дешёвые в бане).
 
 ## Лицензия
 

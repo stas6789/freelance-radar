@@ -1,29 +1,27 @@
-# Список Telegram-каналов с заказами на фриланс.
-# Можно редактировать без изменения кода.
-# Формат: имя канала (@username) или публичная ссылка t.me/name.
+# Список публичных Telegram-каналов с заказами/вакансиями.
+# Проверены на наличие постов в публичной веб-версии (t.me/s/<name>).
+#
+# Формат: имя канала (@username). Можно добавлять/убирать свободно —
+# изменения подхватятся при следующем запуске.
 
 channels:
-  # --- широкие IT/фриланс каналы ---
-  - "@webjobs"
-  - "@jobforjunior"
-  - "@distantsiya"
-  - "@forallfreelancers"
-  - "@remote_it"
-  - "@freelance_ru"
-  - "@ru_jobs"
+  # --- общий поток IT-работ ---
+  - "@progjob"              # Работа для программистов (14k subs)
+  - "@podrabotka_it"        # Подработка в IT
 
-  # --- Python / боты / парсинг ---
-  - "@python_jobs"
-  - "@bot_makers_jobs"
-  - "@parsing_jobs"
-  - "@python_freelance"
+  # --- Python ---
+  - "@pythonrabota"         # Python работа (12k subs)
+  - "@p_rabota"             # Python Junior/Middle
+  - "@RabotaPython"         # Python Senior/Lead
 
-  # --- тексты / копирайт / переводы ---
-  - "@work_texts"
-  - "@copywriter_job"
-  - "@writer_job"
-  - "@translator_job"
+  # --- Rust ---
+  - "@rust_jobs_feed"       # Rust jobs
 
-  # --- дизайн ---
-  - "@design_jobs"
-  - "@design_freelance"
+  # --- Тексты, копирайт ---
+  - "@writers_jobs"         # Вакансии для копирайтеров
+  - "@rabota_copywriter"    # Работа для копирайтеров
+  - "@text_jobs"            # Вакансии для авторов текстов
+
+  # --- Дизайн ---
+  - "@design_vacancy"       # Дизайн вакансии
+  - "@rabota_design"        # Работа для дизайнеров

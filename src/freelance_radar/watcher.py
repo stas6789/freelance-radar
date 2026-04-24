@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from dataclasses import asdict
 from typing import Callable
 
 from telethon import TelegramClient, events
@@ -25,16 +26,18 @@ class Watcher:
         classifier: Callable[[str], Classification],
         storage: Storage,
     ):
+        assert cfg.telethon is not None, "Watcher requires TelethonConfig"
         self.cfg = cfg
+        self.tcfg = cfg.telethon
         self.classify = classifier
         self.storage = storage
         self.client = TelegramClient(
-            cfg.session_name, cfg.api_id, cfg.api_hash
+            self.tcfg.session_name, self.tcfg.api_id, self.tcfg.api_hash
         )
 
     async def start(self) -> None:
-        log.info("starting Telethon client (phone=%s)", self.cfg.phone)
-        await self.client.start(phone=self.cfg.phone)
+        log.info("starting Telethon client (phone=%s)", self.tcfg.phone)
+        await self.client.start(phone=self.tcfg.phone)
         me = await self.client.get_me()
         log.info("authorized as @%s (id=%s)", me.username, me.id)
 
@@ -81,6 +84,19 @@ class Watcher:
         forwarded = False
         if self._should_forward(cls):
             link = _message_link(msg, channel_title)
+            self.storage.save_order(
+                channel=channel_key,
+                message_id=msg.id,
+                link=link,
+                title=cls.title or text[:120],
+                raw_text=text,
+                category=cls.category,
+                budget_rub=cls.budget_rub,
+                urgency=cls.urgency,
+                contact=cls.contact,
+                confidence=cls.confidence,
+                cls_dict=asdict(cls),
+            )
             note = Notification(
                 source_channel=channel_title,
                 message_id=msg.id,
@@ -88,7 +104,7 @@ class Watcher:
                 link=link,
                 cls=cls,
             )
-            await send_notification(self.client, self.cfg.notify_target, note)
+            await send_notification(self.client, self.tcfg.notify_target, note)
             forwarded = True
         else:
             log.debug(
