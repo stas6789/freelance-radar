@@ -66,19 +66,31 @@ class WebWatcher:
             time.sleep(sleep_for)
 
     def _seed_existing(self) -> None:
-        log.info("seeding dedup table with existing posts (will not be forwarded)")
+        """Initial pass: classify recent posts and populate the dashboard,
+        but do NOT forward anything to the bot. This way the user sees data
+        immediately on first run, while the chat with the bot stays clean
+        and only receives genuinely new posts after startup.
+        """
+        log.info(
+            "seeding: classifying recent posts (visible on dashboard, "
+            "not sent to bot)"
+        )
+        total_seen = 0
+        total_orders = 0
         for ch in self.cfg.channels:
             posts = fetch_and_parse(ch, client=self._client)
             for p in posts:
-                if not self.storage.is_seen(p.channel, p.message_id):
-                    self.storage.record(
-                        channel=p.channel,
-                        message_id=p.message_id,
-                        category=None,
-                        budget_rub=None,
-                        forwarded=False,
-                    )
+                if self.storage.is_seen(p.channel, p.message_id):
+                    continue
+                total_seen += 1
+                if self._process(p, forward_to_bot=False):
+                    total_orders += 1
             log.debug("seeded %s: %d posts", ch, len(posts))
+        log.info(
+            "seeding done: %d posts processed, %d saved to dashboard",
+            total_seen,
+            total_orders,
+        )
 
     def _poll_all(self) -> None:
         total_new = 0
@@ -88,12 +100,12 @@ class WebWatcher:
             new = [p for p in posts if not self.storage.is_seen(p.channel, p.message_id)]
             total_new += len(new)
             for post in new:
-                if self._process(post):
+                if self._process(post, forward_to_bot=True):
                     forwarded += 1
         if total_new:
             log.info("poll: %d new posts, %d forwarded", total_new, forwarded)
 
-    def _process(self, post: ScrapedPost) -> bool:
+    def _process(self, post: ScrapedPost, forward_to_bot: bool = True) -> bool:
         text = (post.text or "").strip()
         if not text or len(text) < 30:
             self.storage.record(
@@ -118,9 +130,10 @@ class WebWatcher:
             )
             return False
 
-        forward = self._should_forward(cls)
+        passes_filter = self._should_forward(cls)
 
-        if forward:
+        if passes_filter:
+            # Always save to dashboard, even during seeding.
             self.storage.save_order(
                 channel=post.channel,
                 message_id=post.message_id,
@@ -134,14 +147,16 @@ class WebWatcher:
                 confidence=cls.confidence,
                 cls_dict=asdict(cls),
             )
-            note = Notification(
-                source_channel=post.channel,
-                message_id=post.message_id,
-                raw_text=text,
-                link=post.link,
-                cls=cls,
-            )
-            sent = self.notifier.send(note)
+            sent = False
+            if forward_to_bot:
+                note = Notification(
+                    source_channel=post.channel,
+                    message_id=post.message_id,
+                    raw_text=text,
+                    link=post.link,
+                    cls=cls,
+                )
+                sent = self.notifier.send(note)
             self.storage.record(
                 channel=post.channel,
                 message_id=post.message_id,
@@ -149,7 +164,7 @@ class WebWatcher:
                 budget_rub=cls.budget_rub,
                 forwarded=sent,
             )
-            return sent
+            return True
 
         self.storage.record(
             channel=post.channel,
