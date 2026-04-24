@@ -83,6 +83,31 @@ def _esc(s: str | None) -> str:
     return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
+def _diagnose(description: str) -> str:
+    """Map common Telegram error strings to actionable hints (RU)."""
+    d = (description or "").lower()
+    if "chat not found" in d:
+        return (
+            "CHAT_ID неверный ИЛИ ты не написал /start своему боту. "
+            "Открой бота в Telegram и напиши ему любое сообщение."
+        )
+    if "bot was blocked" in d:
+        return (
+            "Ты заблокировал своего же бота. Разблокируй его в Telegram "
+            "(открой диалог → меню → Разблокировать / Restart)."
+        )
+    if "chat_id is empty" in d or "chat_id" in d and "empty" in d:
+        return "CHAT_ID пустой — проверь .env (переменная CHAT_ID)."
+    if "bot can't initiate conversation" in d:
+        return (
+            "Бот не может писать первым. Напиши своему боту /start "
+            "в Telegram."
+        )
+    if "parse" in d:
+        return "Проблема с форматированием HTML — сообщи разработчику."
+    return "См. описание выше."
+
+
 class BotNotifier:
     def __init__(self, bot_token: str, chat_id: str, timeout: float = 15.0):
         self.token = bot_token
@@ -105,9 +130,23 @@ class BotNotifier:
                     "disable_web_page_preview": True,
                 },
             )
-            r.raise_for_status()
-            data = r.json()
-            if not data.get("ok"):
+            # Parse response before raise_for_status so we can surface
+            # Telegram's own "description" field — raise_for_status only
+            # gives "400 Bad Request" without the actual reason.
+            try:
+                data = r.json()
+            except ValueError:
+                data = None
+            if r.status_code >= 400:
+                reason = (data or {}).get("description", r.text[:300])
+                log.error(
+                    "Telegram sendMessage %d: %s | %s",
+                    r.status_code,
+                    reason,
+                    _diagnose(reason),
+                )
+                return False
+            if not data or not data.get("ok"):
                 log.warning("Bot API sendMessage failed: %s", data)
                 return False
             log.info(
