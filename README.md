@@ -53,6 +53,7 @@ cd freelance-radar
 python3 -m venv .venv
 source .venv/bin/activate            # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
+pip install -e .                     # обязательно! иначе python -m freelance_radar не найдёт модуль
 
 cp .env.example .env                 # Windows: copy .env.example .env
 # теперь открой .env и заполни BOT_TOKEN и CHAT_ID (см. ниже)
